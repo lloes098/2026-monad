@@ -24,8 +24,9 @@ export const monadTestnet = defineChain({
   },
 });
 
+/** 로컬 Hardhat 우선 — 첫 체인이 기본 조회에 쓰이므로 localhost를 앞에 두면 혼선이 줄어듦 */
 export const wagmiConfig = createConfig({
-  chains: [monadTestnet, sepolia, localhost],
+  chains: [localhost, monadTestnet, sepolia],
   connectors: [injected()],
   transports: {
     [monadTestnet.id]: http(monadRpc),
