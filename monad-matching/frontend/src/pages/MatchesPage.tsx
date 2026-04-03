@@ -1,4 +1,7 @@
+import { Link } from "react-router-dom";
+
 import { MOCK_MATCHES } from "../data/mock";
+import { shortAddress } from "../lib/formatAddress";
 
 function statusLabel(status: (typeof MOCK_MATCHES)[number]["status"]) {
   switch (status) {
@@ -20,7 +23,6 @@ export function MatchesPage() {
         <h1 className="page__h">매칭</h1>
         <p className="page__lede">
           48시간 내 첫 메시지가 없으면 양쪽 평판이 감소해요.{" "}
-          <code>expireMatch</code>
         </p>
       </div>
 
@@ -30,7 +32,7 @@ export function MatchesPage() {
             <div className="match-card__row">
               <div>
                 <p className="match-card__name">{m.peerName}</p>
-                <p className="match-card__addr">{m.peerAddress}</p>
+                <p className="match-card__addr">{shortAddress(m.peerAddress)}</p>
               </div>
               <span
                 className={`pill pill--${m.status === "expired" ? "muted" : "accent"}`}
@@ -69,10 +71,24 @@ export function MatchesPage() {
               </p>
             )}
 
-            {!m.expired && !m.firstMessageSent ? (
-              <button type="button" className="btn btn--outline btn--full" disabled>
-                첫 메시지 보냄 (연동 예정)
-              </button>
+            {!m.expired ? (
+              <div className="match-card__actions">
+                <Link
+                  className="btn btn--outline btn--full"
+                  to={`/chat/${m.peerAddress}`}
+                >
+                  채팅 열기
+                </Link>
+                {!m.firstMessageSent ? (
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--full"
+                    disabled
+                  >
+                    첫 메시지 온체인 표시 (다음 단계)
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </li>
         ))}
