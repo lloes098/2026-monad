@@ -4,6 +4,27 @@ import { describe, it } from "node:test";
 import { network } from "hardhat";
 
 describe("MatchingEngine", function () {
+  it("등록하지 않으면 좋아요할 수 없다", async function () {
+    const { viem } = await network.connect();
+
+    const walletClients = await viem.getWalletClients();
+    const user1 = walletClients[0];
+    const user2 = walletClients[1];
+
+    const contract = await viem.deployContract("MatchingEngine");
+
+    let reverted = false;
+    try {
+      await contract.write.likeUser([user2.account.address], {
+        account: user1.account,
+      });
+    } catch {
+      reverted = true;
+    }
+
+    assert.equal(reverted, true);
+  });
+
   it("서로 좋아요하면 매칭되어야 한다", async function () {
     const { viem } = await network.connect();
 
@@ -12,6 +33,9 @@ describe("MatchingEngine", function () {
     const user2 = walletClients[1];
 
     const contract = await viem.deployContract("MatchingEngine");
+
+    await contract.write.registerProfile({ account: user1.account });
+    await contract.write.registerProfile({ account: user2.account });
 
     await contract.write.likeUser([user2.account.address], {
       account: user1.account,
@@ -51,6 +75,9 @@ describe("MatchingEngine", function () {
 
     const contract = await viem.deployContract("MatchingEngine");
 
+    await contract.write.registerProfile({ account: user1.account });
+    await contract.write.registerProfile({ account: user2.account });
+
     await contract.write.likeUser([user2.account.address], {
       account: user1.account,
     });
@@ -71,6 +98,9 @@ describe("MatchingEngine", function () {
     const user2 = walletClients[1];
 
     const contract = await viem.deployContract("MatchingEngine");
+
+    await contract.write.registerProfile({ account: user1.account });
+    await contract.write.registerProfile({ account: user2.account });
 
     await contract.write.likeUser([user2.account.address], {
       account: user1.account,
@@ -101,6 +131,9 @@ describe("MatchingEngine", function () {
     const user2 = walletClients[1];
 
     const contract = await viem.deployContract("MatchingEngine");
+
+    await contract.write.registerProfile({ account: user1.account });
+    await contract.write.registerProfile({ account: user2.account });
 
     await contract.write.likeUser([user2.account.address], {
       account: user1.account,
@@ -152,6 +185,9 @@ describe("MatchingEngine", function () {
     const user2 = walletClients[1];
 
     const contract = await viem.deployContract("MatchingEngine");
+
+    await contract.write.registerProfile({ account: user1.account });
+    await contract.write.registerProfile({ account: user2.account });
 
     await contract.write.likeUser([user2.account.address], {
       account: user1.account,

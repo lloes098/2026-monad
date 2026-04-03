@@ -21,13 +21,24 @@ contract MatchingEngine {
     // 간단한 평판 점수
     mapping(address => int256) public reputationScore;
 
+    /// @notice 온체인에 “등록된 사용자”로 표시 (MVP: 메타데이터는 오프체인)
+    mapping(address => bool) public registered;
+
+    event ProfileRegistered(address indexed user);
     event Liked(address indexed from, address indexed to);
     event Matched(address indexed user1, address indexed user2, uint256 timestamp);
     event FirstMessageMarked(address indexed from, address indexed to, uint256 timestamp);
     event MatchExpired(address indexed user1, address indexed user2, uint256 timestamp);
     event ReputationChanged(address indexed user, int256 newScore);
 
+    function registerProfile() external {
+        require(!registered[msg.sender], "Already registered");
+        registered[msg.sender] = true;
+        emit ProfileRegistered(msg.sender);
+    }
+
     function likeUser(address target) external {
+        require(registered[msg.sender], "Not registered");
         require(target != address(0), "Invalid address");
         require(target != msg.sender, "Cannot like yourself");
         require(!liked[msg.sender][target], "Already liked");
