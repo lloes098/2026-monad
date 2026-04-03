@@ -22,3 +22,7 @@
 
 # Hardhat coverage reports
 /coverage
+
+# Vite frontend
+frontend/node_modules
+frontend/dist
