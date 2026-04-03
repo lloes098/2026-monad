@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd monad-matching/frontend && npm install",
+  "buildCommand": "cd monad-matching/frontend && npm run build",
+  "outputDirectory": "monad-matching/frontend/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
