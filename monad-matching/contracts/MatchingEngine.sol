@@ -8,6 +8,7 @@ contract MatchingEngine {
     struct MatchInfo {
         bool matched;
         uint256 timestamp;
+        /// @notice `matches[from][to]` 기준: from이 to에게 첫 메시지를 보냈는지
         bool firstMessageSent;
         bool expired;
     }
@@ -69,14 +70,12 @@ contract MatchingEngine {
 
     function markFirstMessageSent(address other) external {
         MatchInfo storage myMatch = matches[msg.sender][other];
-        MatchInfo storage otherMatch = matches[other][msg.sender];
 
         require(myMatch.matched, "Not matched");
         require(!myMatch.expired, "Match expired");
         require(!myMatch.firstMessageSent, "Already marked");
 
         myMatch.firstMessageSent = true;
-        otherMatch.firstMessageSent = true;
 
         emit FirstMessageMarked(msg.sender, other, block.timestamp);
     }
@@ -87,7 +86,10 @@ contract MatchingEngine {
 
         require(myMatch.matched, "Not matched");
         require(!myMatch.expired, "Already expired");
-        require(!myMatch.firstMessageSent, "First message already sent");
+        require(
+            !(myMatch.firstMessageSent && otherMatch.firstMessageSent),
+            "Both messaged"
+        );
         require(
             block.timestamp >= myMatch.timestamp + MATCH_EXPIRY,
             "Match not expired yet"
@@ -99,12 +101,16 @@ contract MatchingEngine {
         otherMatch.matched = false;
         otherMatch.expired = true;
 
-        reputationScore[msg.sender] -= GHOSTING_PENALTY;
-        reputationScore[other] -= GHOSTING_PENALTY;
+        if (!myMatch.firstMessageSent) {
+            reputationScore[msg.sender] -= GHOSTING_PENALTY;
+            emit ReputationChanged(msg.sender, reputationScore[msg.sender]);
+        }
+        if (!otherMatch.firstMessageSent) {
+            reputationScore[other] -= GHOSTING_PENALTY;
+            emit ReputationChanged(other, reputationScore[other]);
+        }
 
         emit MatchExpired(msg.sender, other, block.timestamp);
-        emit ReputationChanged(msg.sender, reputationScore[msg.sender]);
-        emit ReputationChanged(other, reputationScore[other]);
     }
 
     function isMatched(address user1, address user2) external view returns (bool) {
@@ -116,6 +122,7 @@ contract MatchingEngine {
         return matches[user1][user2].timestamp;
     }
 
+    /// @notice user1이 user2에게 첫 메시지를 보냈는지 (방향 있음)
     function hasFirstMessage(address user1, address user2) external view returns (bool) {
         return matches[user1][user2].firstMessageSent;
     }

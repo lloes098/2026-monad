@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
 
@@ -41,7 +43,7 @@ export default defineConfig({
     monadTestnet: {
       type: "http",
       chainType: "l1",
-      url: configVariable("MONAD_RPC_URL"),
+      url: "https://testnet-rpc.monad.xyz",
       accounts: [configVariable("MONAD_PRIVATE_KEY")],
     },
     localhost: {

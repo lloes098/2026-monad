@@ -1,19 +1,29 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
 
-import { MOCK_ME } from "../data/mock";
+import { useMyRegistration, useMyReputation } from "../hooks/useMatchingEngine";
+import { useZKPBadge } from "../hooks/useZKPBadge";
 import { shortAddress } from "../lib/formatAddress";
 import { loadLocalProfile } from "../lib/localProfile";
-import { useMyRegistration } from "../hooks/useMatchingEngine";
 
 export function ProfilePage() {
   const { address, isConnected } = useAccount();
   const { isRegistered, isLoadingRegistration } = useMyRegistration();
+  const { score: reputationScore, isLoading: isReputationLoading } = useMyReputation();
+  const {
+    badgeAddress,
+    hasBadge,
+    claimBadge,
+    ready: zkpReady,
+  } = useZKPBadge();
+  const [zkpBusy, setZkpBusy] = useState(false);
+  const [zkpErr, setZkpErr] = useState<string | null>(null);
   const local = loadLocalProfile();
 
   const displayName =
     local.nickname.trim() ||
-    (isConnected && address ? "내 프로필" : MOCK_ME.displayName);
+    (isConnected && address ? "내 프로필" : "프로필");
 
   const addressLine =
     isConnected && address ? shortAddress(address) : null;
@@ -49,6 +59,11 @@ export function ProfilePage() {
                   ? "온체인 등록됨"
                   : "온체인 미등록"}
             </span>
+            <span
+              className={`badge ${hasBadge ? "badge--ok" : "badge--muted"}`}
+            >
+              {hasBadge ? "ZKP 잔액 배지" : "ZKP 배지 없음"}
+            </span>
             <span className="badge badge--muted">성인·학교 인증 (예정)</span>
           </div>
         </div>
@@ -58,10 +73,53 @@ export function ProfilePage() {
         <Link to="/profile/edit" className="btn btn--primary btn--full">
           프로필 편집
         </Link>
+        {isConnected && address && badgeAddress ? (
+          <button
+            type="button"
+            className="btn btn--outline btn--full"
+            disabled={!zkpReady || hasBadge || zkpBusy}
+            title={
+              hasBadge
+                ? "이미 배지를 받았어요."
+                : !zkpReady
+                  ? "네트워크·컨트랙트 주소를 확인해 주세요."
+                  : undefined
+            }
+            onClick={() => {
+              setZkpErr(null);
+              setZkpBusy(true);
+              void claimBadge()
+                .catch((e: unknown) => {
+                  setZkpErr(
+                    e instanceof Error ? e.message : "ZKP 배지 요청에 실패했어요.",
+                  );
+                })
+                .finally(() => setZkpBusy(false));
+            }}
+          >
+            {zkpBusy
+              ? "증명·트랜잭션 처리 중…"
+              : hasBadge
+                ? "잔액 인증 배지 보유 중"
+                : "자산 인증 배지 받기 (ZKP)"}
+          </button>
+        ) : (
+          <p className="panel__hint">
+            ZKP 배지는 지갑 연결 후{" "}
+            <code className="panel__hint">VITE_ZKP_BADGE_ADDRESS</code> 가
+            설정되어 있을 때 사용할 수 있어요.
+          </p>
+        )}
         <Link to="/welcome" className="btn btn--outline btn--full">
           지갑 연결 안내
         </Link>
       </div>
+
+      {zkpErr ? (
+        <p className="banner banner--warn" role="alert">
+          {zkpErr}
+        </p>
+      ) : null}
 
       {local.bio ? (
         <section className="panel">
@@ -103,13 +161,19 @@ export function ProfilePage() {
       )}
 
       <section className="panel">
-        <h2 className="panel__title">평판 (목업)</h2>
+        <h2 className="panel__title">평판</h2>
         <p className="panel__stat">
-          <span className="panel__num">{MOCK_ME.reputation}</span>
+          <span className="panel__num">
+            {isReputationLoading
+              ? "…"
+              : reputationScore !== null
+                ? reputationScore
+                : "—"}
+          </span>
           <span className="panel__unit">점</span>
         </p>
         <p className="panel__hint">
-          다음 단계에서 <code>reputationScore</code> 를 읽어 표시할 수 있어요.
+          48시간 내 첫 메시지를 보내지 않으면 −1 패널티가 쌓여요.
         </p>
       </section>
 
@@ -118,7 +182,7 @@ export function ProfilePage() {
         <dl className="kv">
           <div className="kv__row">
             <dt>MATCH_EXPIRY</dt>
-            <dd>{MOCK_ME.matchExpiryHours}h</dd>
+            <dd>48h</dd>
           </div>
           <div className="kv__row">
             <dt>GHOSTING_PENALTY</dt>

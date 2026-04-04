@@ -6,7 +6,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "frontend:dev": "npm run dev --prefix frontend",
     "frontend:build": "npm run build --prefix frontend",
-    "frontend:preview": "npm run preview --prefix frontend"
+    "frontend:preview": "npm run preview --prefix frontend",
+    "zkp:build": "bash scripts/zkp-build.sh"
   },
   "keywords": [],
   "author": "",
@@ -18,9 +19,11 @@
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.3",
     "@types/node": "^22.19.16",
     "chai": "^6.2.2",
+    "circomlib": "^2.0.5",
     "dotenv": "^17.4.0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
     "hardhat": "^3.3.0",
+    "snarkjs": "^0.7.6",
     "typescript": "~5.8.0",
     "viem": "^2.47.6"
   },

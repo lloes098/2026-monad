@@ -114,12 +114,18 @@ describe("MatchingEngine", function () {
       account: user1.account,
     });
 
-    const sent = await contract.read.hasFirstMessage([
+    const sent12 = await contract.read.hasFirstMessage([
       user1.account.address,
       user2.account.address,
     ]);
 
-    assert.equal(sent, true);
+    const sent21 = await contract.read.hasFirstMessage([
+      user2.account.address,
+      user1.account.address,
+    ]);
+
+    assert.equal(sent12, true);
+    assert.equal(sent21, false);
   });
 
   it("48시간이 지나고 첫 메시지가 없으면 매칭이 만료되어야 한다", async function () {
@@ -176,7 +182,7 @@ describe("MatchingEngine", function () {
     assert.equal(Number(rep2), -1);
   });
 
-  it("첫 메시지를 보냈으면 만료되면 안 된다", async function () {
+  it("한쪽만 첫 메시지를 보냈으면 48시간 후 상대만 평판이 깎인다", async function () {
     const { viem } = await network.connect();
 
     const publicClient = await viem.getPublicClient();
@@ -199,6 +205,56 @@ describe("MatchingEngine", function () {
 
     await contract.write.markFirstMessageSent([user2.account.address], {
       account: user1.account,
+    });
+
+    await publicClient.transport.request({
+      method: "evm_increaseTime",
+      params: [48 * 60 * 60 + 1],
+    });
+
+    await publicClient.transport.request({
+      method: "evm_mine",
+      params: [],
+    });
+
+    await contract.write.expireMatch([user2.account.address], {
+      account: user1.account,
+    });
+
+    const rep1 = await contract.read.reputationScore([user1.account.address]);
+    const rep2 = await contract.read.reputationScore([user2.account.address]);
+
+    assert.equal(Number(rep1), 0);
+    assert.equal(Number(rep2), -1);
+  });
+
+  it("양쪽 모두 첫 메시지를 보냈으면 고스팅 만료를 호출할 수 없다", async function () {
+    const { viem } = await network.connect();
+
+    const publicClient = await viem.getPublicClient();
+    const walletClients = await viem.getWalletClients();
+    const user1 = walletClients[0];
+    const user2 = walletClients[1];
+
+    const contract = await viem.deployContract("MatchingEngine");
+
+    await contract.write.registerProfile({ account: user1.account });
+    await contract.write.registerProfile({ account: user2.account });
+
+    await contract.write.likeUser([user2.account.address], {
+      account: user1.account,
+    });
+
+    await contract.write.likeUser([user1.account.address], {
+      account: user2.account,
+    });
+
+    await contract.write.markFirstMessageSent([user2.account.address], {
+      account: user1.account,
+    });
+
+    await contract.write.markFirstMessageSent([user1.account.address], {
+      account: user2.account,
     });
 
     await publicClient.transport.request({

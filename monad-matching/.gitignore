@@ -26,3 +26,7 @@
 # Vite frontend
 frontend/node_modules
 frontend/dist
+
+# ZKP build artifacts (wasm/zkey are copied to frontend/public/zkp)
+/circuits/build
+/circuits/*.ptau

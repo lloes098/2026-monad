@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useAccount } from "wagmi";
+import {
+  useAccount,
+  usePublicClient,
+  useWaitForTransactionReceipt,
+  useWriteContract,
+} from "wagmi";
 import { isAddress } from "viem";
 
+import { matchingEngineAbi } from "../abis/matchingEngine";
 import { MOCK_MATCHES } from "../data/mock";
+import { useOnChainMatch } from "../hooks/useOnChainMatch";
 import { chatThreadKey } from "../lib/chatThreadKey";
 import { shortAddress } from "../lib/formatAddress";
 import { getSupabase, hasSupabaseEnv } from "../lib/supabaseClient";
@@ -50,7 +57,48 @@ export function ChatPage() {
   const validPeer =
     normalized && isAddress(normalized) ? normalized : undefined;
 
-  const { address } = useAccount();
+  const { address, chainId } = useAccount();
+  const publicClient = usePublicClient();
+
+  const {
+    contractAddress,
+    matchedOnChain,
+    expiredOnChain,
+    iSentFirstOnChain,
+    canExpireGhost,
+    expiryReached,
+    bothMessagedOnChain,
+    refetchOnChainMatch,
+  } = useOnChainMatch(validPeer);
+
+  const {
+    data: chainTxHash,
+    writeContractAsync,
+    isPending: isChainWritePending,
+    error: chainWriteError,
+    reset: resetChainWrite,
+  } = useWriteContract();
+
+  const {
+    isLoading: isChainConfirming,
+    isSuccess: isChainConfirmed,
+    isError: isChainReceiptError,
+  } = useWaitForTransactionReceipt({
+    hash: chainTxHash,
+    chainId: chainId ?? undefined,
+    query: {
+      enabled: Boolean(chainTxHash && chainId),
+    },
+  });
+
+  useEffect(() => {
+    if (isChainConfirmed) void refetchOnChainMatch();
+  }, [isChainConfirmed, refetchOnChainMatch]);
+
+  useEffect(() => {
+    if (isChainReceiptError) resetChainWrite();
+  }, [isChainReceiptError, resetChainWrite]);
+
   const threadKey = useMemo(
     () => (address && validPeer ? chatThreadKey(address, validPeer) : null),
     [address, validPeer],
@@ -129,6 +177,42 @@ export function ChatPage() {
     );
   }
 
+  async function maybeMarkFirstMessageOnChain() {
+    if (!contractAddress || !address || !validPeer || !publicClient) return;
+    await refetchOnChainMatch();
+    try {
+      const [onMatched, alreadySent, isEx] = await Promise.all([
+        publicClient.readContract({
+          address: contractAddress,
+          abi: matchingEngineAbi,
+          functionName: "isMatched",
+          args: [address, validPeer],
+        }),
+        publicClient.readContract({
+          address: contractAddress,
+          abi: matchingEngineAbi,
+          functionName: "hasFirstMessage",
+          args: [address, validPeer],
+        }),
+        publicClient.readContract({
+          address: contractAddress,
+          abi: matchingEngineAbi,
+          functionName: "isExpired",
+          args: [address, validPeer],
+        }),
+      ]);
+      if (!onMatched || isEx || alreadySent) return;
+      await writeContractAsync({
+        address: contractAddress,
+        abi: matchingEngineAbi,
+        functionName: "markFirstMessageSent",
+        args: [validPeer],
+      });
+    } catch (e) {
+      console.error("[chat] markFirstMessageSent", e);
+    }
+  }
+
   async function send() {
     const t = draft.trim();
     if (!t) return;
@@ -147,6 +231,7 @@ export function ChatPage() {
       setRemoteError(null);
       setDraft("");
       await loadRemote();
+      await maybeMarkFirstMessageOnChain();
       return;
     }
     const now = new Date();
@@ -156,7 +241,25 @@ export function ChatPage() {
       { id: crypto.randomUUID(), fromMe: true, text: t, at },
     ]);
     setDraft("");
+    await maybeMarkFirstMessageOnChain();
   }
+
+  async function onExpireGhosting() {
+    if (!contractAddress || !validPeer) return;
+    try {
+      await writeContractAsync({
+        address: contractAddress,
+        abi: matchingEngineAbi,
+        functionName: "expireMatch",
+        args: [validPeer],
+      });
+    } catch (e) {
+      console.error("[chat] expireMatch", e);
+    }
+  }
+
+  const chainBusy =
+    isChainWritePending || (Boolean(chainTxHash && chainId) && isChainConfirming);
 
   return (
     <div className="page page--chat">
@@ -197,6 +300,32 @@ export function ChatPage() {
         </p>
       ) : null}
 
+      {contractAddress && address ? (
+        <p className="chat-supabase-hint" aria-live="polite">
+          {!matchedOnChain
+            ? "온체인에 이 상대와의 매칭이 없어요. 좋아요 매칭 후 첫 메시지를 온체인에 기록할 수 있어요."
+            : expiredOnChain
+              ? "이 매칭은 온체인에서 만료됐어요."
+              : bothMessagedOnChain
+                ? "양쪽 모두 첫 메시지를 보냈어요. 고스팅 만료는 적용되지 않아요."
+                : iSentFirstOnChain
+                  ? "내 첫 메시지는 온체인에 기록됐어요."
+                  : "첫 메시지를 내면 온체인에 기록돼요."}
+          {matchedOnChain &&
+          !expiredOnChain &&
+          !bothMessagedOnChain &&
+          !expiryReached ? (
+            <span> 48시간이 지나면 고스팅 처리를 온체인에 제출할 수 있어요.</span>
+          ) : null}
+        </p>
+      ) : null}
+
+      {chainWriteError instanceof Error ? (
+        <p className="banner banner--warn chat-supabase-banner" role="alert">
+          온체인 트랜잭션: {chainWriteError.message}
+        </p>
+      ) : null}
+
       <div className="chat-bubbles">
         {msgs.length === 0 ? (
           <p className="chat-bubbles__empty">첫 메시지를 보내 보세요.</p>
@@ -222,8 +351,13 @@ export function ChatPage() {
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), void send())}
         />
-        <button type="button" className="chat-compose__send" onClick={() => void send()}>
-          보내기
+        <button
+          type="button"
+          className="chat-compose__send"
+          disabled={chainBusy}
+          onClick={() => void send()}
+        >
+          {chainBusy ? "온체인 확인 중…" : "보내기"}
         </button>
       </div>
 
@@ -234,8 +368,26 @@ export function ChatPage() {
         >
           프로필 보기
         </Link>
-        <button type="button" className="chat-v2-actions__primary" disabled>
-          데이트 종료
+        <button
+          type="button"
+          className="chat-v2-actions__primary"
+          disabled={!canExpireGhost || chainBusy}
+          title={
+            !contractAddress
+              ? "VITE_MATCHING_ENGINE_ADDRESS 가 없어요."
+              : !matchedOnChain
+                ? "온체인 매칭이 없어요."
+                : expiredOnChain
+                  ? "이미 만료됐어요."
+                  : bothMessagedOnChain
+                    ? "양쪽이 모두 메시지를 보내 고스팅 만료를 쓸 수 없어요."
+                    : !expiryReached
+                      ? "48시간이 지나야 해요."
+                      : "메시지 안 보낸 쪽만 평판이 깎여요."
+          }
+          onClick={() => void onExpireGhosting()}
+        >
+          {chainBusy ? "처리 중…" : "고스팅 만료 (온체인)"}
         </button>
       </div>
     </div>
