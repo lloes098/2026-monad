@@ -64,7 +64,9 @@ export function ProfilePage() {
             >
               {hasBadge ? "ZKP 잔액 배지" : "ZKP 배지 없음"}
             </span>
-            <span className="badge badge--muted">성인·학교 인증 (예정)</span>
+            <span className="badge badge--muted">
+              소속·나이 ZKP 인증 (예정)
+            </span>
           </div>
         </div>
       </div>
@@ -73,41 +75,57 @@ export function ProfilePage() {
         <Link to="/profile/edit" className="btn btn--primary btn--full">
           프로필 편집
         </Link>
-        {isConnected && address && badgeAddress ? (
-          <button
-            type="button"
-            className="btn btn--outline btn--full"
-            disabled={!zkpReady || hasBadge || zkpBusy}
-            title={
-              hasBadge
-                ? "이미 배지를 받았어요."
-                : !zkpReady
-                  ? "네트워크·컨트랙트 주소를 확인해 주세요."
-                  : undefined
-            }
-            onClick={() => {
-              setZkpErr(null);
-              setZkpBusy(true);
-              void claimBadge()
-                .catch((e: unknown) => {
-                  setZkpErr(
-                    e instanceof Error ? e.message : "ZKP 배지 요청에 실패했어요.",
-                  );
-                })
-                .finally(() => setZkpBusy(false));
-            }}
-          >
-            {zkpBusy
-              ? "증명·트랜잭션 처리 중…"
-              : hasBadge
-                ? "잔액 인증 배지 보유 중"
-                : "자산 인증 배지 받기 (ZKP)"}
-          </button>
+        {isConnected && address ? (
+          <>
+            <button
+              type="button"
+              className="btn btn--outline btn--full"
+              disabled={
+                !badgeAddress || !zkpReady || hasBadge || zkpBusy
+              }
+              title={
+                hasBadge
+                  ? "이미 배지를 받았어요."
+                  : !badgeAddress
+                    ? "frontend/.env에 VITE_ZKP_BADGE_ADDRESS(배포된 ZKPBadge 주소)를 넣어 주세요."
+                    : !zkpReady
+                      ? "네트워크·컨트랙트를 확인해 주세요."
+                      : undefined
+              }
+              onClick={() => {
+                if (!badgeAddress) return;
+                setZkpErr(null);
+                setZkpBusy(true);
+                void claimBadge()
+                  .catch((e: unknown) => {
+                    setZkpErr(
+                      e instanceof Error
+                        ? e.message
+                        : "ZKP 배지 요청에 실패했어요.",
+                    );
+                  })
+                  .finally(() => setZkpBusy(false));
+              }}
+            >
+              {zkpBusy
+                ? "증명·트랜잭션 처리 중…"
+                : hasBadge
+                  ? "잔액 인증 배지 보유 중"
+                  : "자산 인증 배지 받기 (ZKP)"}
+            </button>
+            {!badgeAddress ? (
+              <p className="panel__hint">
+                버튼을 쓰려면{" "}
+                <code className="panel__hint">VITE_ZKP_BADGE_ADDRESS</code> 에
+                ZKPBadge 배포 주소를 넣고 개발 서버를 다시 띄워 주세요. (
+                <code className="panel__hint">npx hardhat run scripts/deploy.ts</code>{" "}
+                출력 참고)
+              </p>
+            ) : null}
+          </>
         ) : (
           <p className="panel__hint">
-            ZKP 배지는 지갑 연결 후{" "}
-            <code className="panel__hint">VITE_ZKP_BADGE_ADDRESS</code> 가
-            설정되어 있을 때 사용할 수 있어요.
+            ZKP 배지는 지갑을 연결한 뒤 사용할 수 있어요.
           </p>
         )}
         <Link to="/welcome" className="btn btn--outline btn--full">
