@@ -184,6 +184,17 @@ code {
   background: var(--surface);
 }
 
+.topbar__btn--registered {
+  border-color: rgba(45, 134, 89, 0.35);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.topbar__btn--registered:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
 .main {
   flex: 1;
   min-height: 0;
