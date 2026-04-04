@@ -4,26 +4,23 @@ pragma solidity ^0.8.28;
 contract MatchingEngine {
     uint256 public constant MATCH_EXPIRY = 48 hours;
     int256 public constant GHOSTING_PENALTY = 1;
+    uint256 public constant DEPOSIT = 0.01 ether;
 
     struct MatchInfo {
         bool matched;
         uint256 timestamp;
-        /// @notice `matches[from][to]` 기준: from이 to에게 첫 메시지를 보냈는지
         bool firstMessageSent;
         bool expired;
     }
 
-    // A가 B를 좋아요 했는지
     mapping(address => mapping(address => bool)) public liked;
-
-    // user1 기준 user2와의 매칭 정보
     mapping(address => mapping(address => MatchInfo)) public matches;
-
-    // 간단한 평판 점수
     mapping(address => int256) public reputationScore;
-
-    /// @notice 온체인에 “등록된 사용자”로 표시 (MVP: 메타데이터는 오프체인)
     mapping(address => bool) public registered;
+
+    // Escrow
+    mapping(address => uint256) public deposits;
+    mapping(address => mapping(address => bool)) public refunded;
 
     event ProfileRegistered(address indexed user);
     event Liked(address indexed from, address indexed to);
@@ -31,11 +28,25 @@ contract MatchingEngine {
     event FirstMessageMarked(address indexed from, address indexed to, uint256 timestamp);
     event MatchExpired(address indexed user1, address indexed user2, uint256 timestamp);
     event ReputationChanged(address indexed user, int256 newScore);
+    event Deposited(address indexed user, uint256 amount);
+    event Refunded(address indexed user, uint256 amount);
+    event Slashed(address indexed user, uint256 amount);
 
+    /// @notice 예치금 없이 등록 (하위 호환)
     function registerProfile() external {
         require(!registered[msg.sender], "Already registered");
         registered[msg.sender] = true;
         emit ProfileRegistered(msg.sender);
+    }
+
+    /// @notice 예치금과 함께 등록 (DEPOSIT = 0.01 MON)
+    function registerWithDeposit() external payable {
+        require(!registered[msg.sender], "Already registered");
+        require(msg.value == DEPOSIT, "Wrong deposit amount");
+        registered[msg.sender] = true;
+        deposits[msg.sender] += msg.value;
+        emit ProfileRegistered(msg.sender);
+        emit Deposited(msg.sender, msg.value);
     }
 
     function likeUser(address target) external {
@@ -76,8 +87,24 @@ contract MatchingEngine {
         require(!myMatch.firstMessageSent, "Already marked");
 
         myMatch.firstMessageSent = true;
-
         emit FirstMessageMarked(msg.sender, other, block.timestamp);
+    }
+
+    /// @notice 매칭 + 양쪽 첫 메시지 확인 후 예치금 환급
+    function claimRefund(address partner) external {
+        require(matches[msg.sender][partner].matched, "Not matched");
+        require(matches[msg.sender][partner].firstMessageSent, "You haven't sent first message");
+        require(matches[partner][msg.sender].firstMessageSent, "Partner hasn't sent first message");
+        require(!refunded[msg.sender][partner], "Already refunded");
+        require(deposits[msg.sender] > 0, "No deposit to refund");
+
+        refunded[msg.sender][partner] = true;
+        uint256 amount = deposits[msg.sender];
+        deposits[msg.sender] = 0;
+
+        (bool ok, ) = payable(msg.sender).call{value: amount}("");
+        require(ok, "Refund failed");
+        emit Refunded(msg.sender, amount);
     }
 
     function expireMatch(address other) external {
@@ -97,20 +124,29 @@ contract MatchingEngine {
 
         myMatch.matched = false;
         myMatch.expired = true;
-
         otherMatch.matched = false;
         otherMatch.expired = true;
 
         if (!myMatch.firstMessageSent) {
             reputationScore[msg.sender] -= GHOSTING_PENALTY;
             emit ReputationChanged(msg.sender, reputationScore[msg.sender]);
+            _slashDeposit(msg.sender);
         }
         if (!otherMatch.firstMessageSent) {
             reputationScore[other] -= GHOSTING_PENALTY;
             emit ReputationChanged(other, reputationScore[other]);
+            _slashDeposit(other);
         }
 
         emit MatchExpired(msg.sender, other, block.timestamp);
+    }
+
+    function _slashDeposit(address ghoster) internal {
+        uint256 amount = deposits[ghoster];
+        if (amount == 0) return;
+        deposits[ghoster] = 0;
+        // 예치금 소각 (컨트랙트에 잠금)
+        emit Slashed(ghoster, amount);
     }
 
     function isMatched(address user1, address user2) external view returns (bool) {
@@ -122,7 +158,6 @@ contract MatchingEngine {
         return matches[user1][user2].timestamp;
     }
 
-    /// @notice user1이 user2에게 첫 메시지를 보냈는지 (방향 있음)
     function hasFirstMessage(address user1, address user2) external view returns (bool) {
         return matches[user1][user2].firstMessageSent;
     }

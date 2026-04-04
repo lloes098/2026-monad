@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract, useReadContract } from "wagmi";
 
+import { matchingEngineAbi } from "../abis/matchingEngine";
 import { useMyMatches, type OnChainMatch } from "../hooks/useMyMatches";
 import { getMatchingEngineAddress } from "../lib/contracts";
+import type { Address } from "viem";
 
 function statusLabel(status: OnChainMatch["status"]) {
   switch (status) {
@@ -13,6 +15,47 @@ function statusLabel(status: OnChainMatch["status"]) {
     case "expired":
       return "만료";
   }
+}
+
+function RefundButton({ peerAddress, contractAddress }: { peerAddress: Address; contractAddress: Address }) {
+  const { address } = useAccount();
+  const { writeContract, isPending } = useWriteContract();
+
+  const { data: myDeposit } = useReadContract({
+    address: contractAddress,
+    abi: matchingEngineAbi,
+    functionName: "deposits",
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address) },
+  });
+
+  const { data: alreadyRefunded } = useReadContract({
+    address: contractAddress,
+    abi: matchingEngineAbi,
+    functionName: "refunded",
+    args: address ? [address, peerAddress] : undefined,
+    query: { enabled: Boolean(address) },
+  });
+
+  if (!myDeposit || myDeposit === 0n || alreadyRefunded) return null;
+
+  return (
+    <button
+      type="button"
+      className="btn btn--outline btn--full"
+      disabled={isPending}
+      onClick={() =>
+        writeContract({
+          address: contractAddress,
+          abi: matchingEngineAbi,
+          functionName: "claimRefund",
+          args: [peerAddress],
+        })
+      }
+    >
+      {isPending ? "환급 중…" : "예치금 환급 받기"}
+    </button>
+  );
 }
 
 export function MatchesPage() {
@@ -108,6 +151,12 @@ export function MatchesPage() {
                   >
                     채팅 열기
                   </Link>
+                  {m.iSentFirst && m.peerSentFirst && contractAddress && (
+                    <RefundButton
+                      peerAddress={m.peerAddress}
+                      contractAddress={contractAddress}
+                    />
+                  )}
                 </div>
               ) : null}
             </li>
