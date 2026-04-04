@@ -1,11 +1,9 @@
 import { network } from "hardhat";
 
 async function main() {
-  const connection = await network.connect();
-
-  console.log(`Connected to ${connection.networkName}...`);
-
-  const { viem } = connection;
+  const { viem } = await network.connect({
+    network: "monadTestnet",
+  });
 
   console.log("Deploying Groth16Verifier...");
   const verifier = await viem.deployContract("Groth16Verifier");
