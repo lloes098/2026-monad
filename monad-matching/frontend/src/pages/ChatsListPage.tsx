@@ -84,14 +84,18 @@ export function ChatsListPage() {
   const threads = useMemo((): DisplayThread[] => {
     if (folder === "requests") return [];
     if (useRemote) {
-      if (folder === "inbox") return fromRemoteRows(remoteThreads);
+      if (folder === "inbox") {
+        const remote = fromRemoteRows(remoteThreads);
+        // 데모: 원격 스레드가 없으면 목 데이터 1건 표시
+        return remote.length > 0 ? remote : mockThreads("inbox").slice(0, 1);
+      }
       return [];
     }
     return mockThreads(folder);
   }, [folder, useRemote, remoteThreads]);
 
   const inboxCount = useRemote
-    ? remoteThreads.length
+    ? Math.max(remoteThreads.length, 1)
     : MOCK_MATCHES.filter((m) => !m.expired).length;
 
   return (

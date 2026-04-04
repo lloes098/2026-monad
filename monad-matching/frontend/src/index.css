@@ -976,6 +976,44 @@ button.category-tile {
   color: var(--on-accent);
 }
 
+/* ── discover card badges ─────────────────────────────────────────────── */
+.reco-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+
+.reco-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15em 0.55em;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(6px);
+}
+
+.reco-badge--balance {
+  background: rgba(255, 215, 0, 0.22);
+  color: #fde68a;
+  border: 1px solid rgba(253, 230, 138, 0.35);
+}
+
+.reco-badge--adult {
+  background: rgba(74, 222, 128, 0.18);
+  color: #86efac;
+  border: 1px solid rgba(134, 239, 172, 0.3);
+}
+
+.reco-badge--age {
+  background: rgba(147, 197, 253, 0.18);
+  color: #bfdbfe;
+  border: 1px solid rgba(191, 219, 254, 0.3);
+}
+
 .btn {
   appearance: none;
   border: none;

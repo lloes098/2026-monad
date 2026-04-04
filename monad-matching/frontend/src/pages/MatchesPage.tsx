@@ -3,6 +3,7 @@ import { useAccount, useWriteContract, useReadContract } from "wagmi";
 
 import { matchingEngineAbi } from "../abis/matchingEngine";
 import { useMyMatches, type OnChainMatch } from "../hooks/useMyMatches";
+import { MOCK_MATCHES } from "../data/mock";
 import { getMatchingEngineAddress } from "../lib/contracts";
 import type { Address } from "viem";
 
@@ -92,7 +93,36 @@ export function MatchesPage() {
           </button>
         </div>
       ) : matches.length === 0 ? (
-        <p className="empty-state">아직 매칭이 없어요. 발견 탭에서 좋아요를 보내보세요.</p>
+        /* 데모: 온체인 매칭이 없을 때 목 데이터 1건 표시 */
+        <ul className="match-list">
+          {[MOCK_MATCHES[0]].map((m) => (
+            <li key={m.id} className="match-card">
+              <div className="match-card__row">
+                <div>
+                  <p className="match-card__name">{m.peerName} <span className="pill pill--muted" style={{fontSize:"0.65rem",marginLeft:"0.3rem"}}>데모</span></p>
+                  <p className="match-card__addr">{m.peerAddress}</p>
+                </div>
+                <span className="pill pill--accent">{m.status === "messaged" ? "첫 메시지 완료" : m.status === "active" ? "응답 대기" : "만료"}</span>
+              </div>
+              <div className="match-card__meta">
+                <span>매칭 {m.matchedAtLabel}</span>
+                <span>내 첫 메시지 {m.firstMessageSent ? "온체인 기록됨" : "아직"} · 상대방 기록됨</span>
+              </div>
+              <div className="timer">
+                <div className="timer__labels">
+                  <span>48시간 윈도우</span>
+                  <span>{m.timeLeftPercent}% 남음</span>
+                </div>
+                <div className="timer__track">
+                  <div className="timer__fill" style={{ width: `${m.timeLeftPercent}%` }} />
+                </div>
+              </div>
+              <div className="match-card__actions">
+                <Link className="btn btn--outline btn--full" to={`/chat/${m.peerAddress}`}>채팅 열기</Link>
+              </div>
+            </li>
+          ))}
+        </ul>
       ) : (
         <ul className="match-list">
           {matches.map((m) => (
