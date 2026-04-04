@@ -73,19 +73,30 @@ export function useZKPBadge() {
       );
     }
 
-    const pub0 = BigInt(publicSignals[0] ?? 0);
-    if (pub0 !== ZKP_THRESHOLD_WEI) {
+    const pubVals = publicSignals.map((s) => BigInt(s));
+    const hasThreshold = pubVals.some((v) => v === ZKP_THRESHOLD_WEI);
+    if (!hasThreshold) {
       throw new Error("공개 입력(threshold)이 컨트랙트와 일치하지 않아요.");
+    }
+    if (publicSignals.length < 2) {
+      throw new Error(
+        "회로 공개 신호가 2개여야 해요. `npm run zkp:build` 로 wasm/zkey 를 다시 만들었는지 확인해 주세요.",
+      );
     }
 
     const rawCalldata = await groth16.exportSolidityCallData(proof, publicSignals);
     const { a, b, c } = parseGroth16SolidityCalldata(rawCalldata);
 
+    const pubSignalsArg: readonly [bigint, bigint] = [
+      BigInt(publicSignals[0]),
+      BigInt(publicSignals[1]),
+    ];
+
     const hash = await walletClient.writeContract({
       address: badgeAddress,
       abi: zkpBadgeAbi,
       functionName: "claimBadge",
-      args: [a, b, c],
+      args: [a, b, c, pubSignalsArg],
       chain: walletClient.chain,
       account: address as Address,
     });

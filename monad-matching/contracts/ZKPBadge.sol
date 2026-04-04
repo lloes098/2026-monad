@@ -6,7 +6,7 @@ interface IZKVerifier {
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
-        uint256[1] calldata _pubSignals
+        uint256[2] calldata _pubSignals
     ) external view returns (bool);
 }
 
@@ -23,15 +23,21 @@ contract ZKPBadge {
         verifier = IZKVerifier(_verifier);
     }
 
+    /// @notice `pubSignals`는 snarkjs `fullProve` 결과와 동일한 순서·값이어야 합니다 (회로 공개 입력·출력).
     function claimBadge(
         uint256[2] calldata a,
         uint256[2][2] calldata b,
-        uint256[2] calldata c
+        uint256[2] calldata c,
+        uint256[2] calldata pubSignals
     ) external {
         require(!hasBadge[msg.sender], "Already has badge");
 
-        uint256[1] memory pubSignals;
-        pubSignals[0] = THRESHOLD;
+        uint256 t0 = pubSignals[0];
+        uint256 t1 = pubSignals[1];
+        require(
+            (t0 == THRESHOLD && t1 == 1) || (t0 == 1 && t1 == THRESHOLD),
+            "bad threshold/valid"
+        );
 
         require(verifier.verifyProof(a, b, c, pubSignals), "Invalid proof");
 
