@@ -1,19 +1,13 @@
 import { network } from "hardhat";
 
 async function main() {
-  console.log("Connecting to localhost...");
+  const { viem } = await network.connect({
+    network: "monadTestnet",
+  });
 
-  const { viem } = await network.connect("localhost");
+  const matchingEngine = await viem.deployContract("MatchingEngine");
 
-  console.log("Deploying MatchingEngine...");
-
-  const contract = await viem.deployContract("MatchingEngine");
-
-  console.log("Contract address:", contract.address);
-  console.log(
-    "\n프론트 .env 예:\nVITE_MATCHING_ENGINE_ADDRESS=",
-    contract.address,
-  );
+  console.log("MatchingEngine deployed at:", matchingEngine.address);
 }
 
 main().catch((error) => {

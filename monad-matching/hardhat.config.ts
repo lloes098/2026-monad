@@ -1,5 +1,11 @@
+import { config as loadEnv } from "dotenv";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+loadEnv({ path: join(__dirname, ".env") });
 
 export default defineConfig({
   plugins: [hardhatToolboxViemPlugin],
@@ -41,8 +47,11 @@ export default defineConfig({
     monadTestnet: {
       type: "http",
       chainType: "l1",
-      url: configVariable("MONAD_RPC_URL"),
-      accounts: [configVariable("MONAD_PRIVATE_KEY")],
+      url: process.env.MONAD_RPC_URL!,
+      accounts: [
+        `0x${(process.env.PRIVATE_KEY ?? "").trim().replace(/^0x/i, "")}`,
+      ],
+      chainId: 10143,
     },
     localhost: {
       type: "http",
