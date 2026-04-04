@@ -1111,6 +1111,11 @@ button.category-tile {
   gap: 0.65rem;
 }
 
+.match-card__row > div {
+  min-width: 0;
+  flex: 1;
+}
+
 .match-card__name {
   margin: 0;
   font-size: 0.95rem;
@@ -1123,6 +1128,9 @@ button.category-tile {
   font-size: 0.74rem;
   color: var(--muted);
   letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .match-card__meta {

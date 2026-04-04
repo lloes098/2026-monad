@@ -1,68 +1,9 @@
 import { Link } from "react-router-dom";
-import { useAccount, useWriteContract, useReadContract } from "wagmi";
 
-import { matchingEngineAbi } from "../abis/matchingEngine";
-import { useMyMatches, type OnChainMatch } from "../hooks/useMyMatches";
 import { MOCK_MATCHES } from "../data/mock";
-import { getMatchingEngineAddress } from "../lib/contracts";
-import type { Address } from "viem";
-
-function statusLabel(status: OnChainMatch["status"]) {
-  switch (status) {
-    case "messaged":
-      return "첫 메시지 완료";
-    case "active":
-      return "응답 대기";
-    case "expired":
-      return "만료";
-  }
-}
-
-function RefundButton({ peerAddress, contractAddress }: { peerAddress: Address; contractAddress: Address }) {
-  const { address } = useAccount();
-  const { writeContract, isPending } = useWriteContract();
-
-  const { data: myDeposit } = useReadContract({
-    address: contractAddress,
-    abi: matchingEngineAbi,
-    functionName: "deposits",
-    args: address ? [address] : undefined,
-    query: { enabled: Boolean(address) },
-  });
-
-  const { data: alreadyRefunded } = useReadContract({
-    address: contractAddress,
-    abi: matchingEngineAbi,
-    functionName: "refunded",
-    args: address ? [address, peerAddress] : undefined,
-    query: { enabled: Boolean(address) },
-  });
-
-  if (!myDeposit || myDeposit === 0n || alreadyRefunded) return null;
-
-  return (
-    <button
-      type="button"
-      className="btn btn--outline btn--full"
-      disabled={isPending}
-      onClick={() =>
-        writeContract({
-          address: contractAddress,
-          abi: matchingEngineAbi,
-          functionName: "claimRefund",
-          args: [peerAddress],
-        })
-      }
-    >
-      {isPending ? "환급 중…" : "예치금 환급 받기"}
-    </button>
-  );
-}
 
 export function MatchesPage() {
-  const { isConnected } = useAccount();
-  const contractAddress = getMatchingEngineAddress();
-  const { matches, loading, error, refetch } = useMyMatches();
+  const demo = MOCK_MATCHES[0];
 
   return (
     <div className="page">
@@ -73,126 +14,35 @@ export function MatchesPage() {
         </p>
       </div>
 
-      {!isConnected ? (
-        <p className="banner banner--warn">지갑을 연결하면 온체인 매칭 목록이 표시돼요.</p>
-      ) : !contractAddress ? (
-        <p className="banner banner--warn">
-          VITE_MATCHING_ENGINE_ADDRESS 가 설정되지 않아 매칭 목록을 불러올 수 없어요.
-        </p>
-      ) : loading ? (
-        <p className="empty-state">매칭 목록 불러오는 중…</p>
-      ) : error ? (
-        <div>
-          <p className="banner banner--warn">{error}</p>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => void refetch()}
-          >
-            다시 시도
-          </button>
-        </div>
-      ) : matches.length === 0 ? (
-        /* 데모: 온체인 매칭이 없을 때 목 데이터 1건 표시 */
-        <ul className="match-list">
-          {[MOCK_MATCHES[0]].map((m) => (
-            <li key={m.id} className="match-card">
-              <div className="match-card__row">
-                <div>
-                  <p className="match-card__name">{m.peerName} <span className="pill pill--muted" style={{fontSize:"0.65rem",marginLeft:"0.3rem"}}>데모</span></p>
-                  <p className="match-card__addr">{m.peerAddress}</p>
-                </div>
-                <span className="pill pill--accent">{m.status === "messaged" ? "첫 메시지 완료" : m.status === "active" ? "응답 대기" : "만료"}</span>
-              </div>
-              <div className="match-card__meta">
-                <span>매칭 {m.matchedAtLabel}</span>
-                <span>내 첫 메시지 {m.firstMessageSent ? "온체인 기록됨" : "아직"} · 상대방 기록됨</span>
-              </div>
-              <div className="timer">
-                <div className="timer__labels">
-                  <span>48시간 윈도우</span>
-                  <span>{m.timeLeftPercent}% 남음</span>
-                </div>
-                <div className="timer__track">
-                  <div className="timer__fill" style={{ width: `${m.timeLeftPercent}%` }} />
-                </div>
-              </div>
-              <div className="match-card__actions">
-                <Link className="btn btn--outline btn--full" to={`/chat/${m.peerAddress}`}>채팅 열기</Link>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <ul className="match-list">
-          {matches.map((m) => (
-            <li key={m.peerAddress} className="match-card">
-              <div className="match-card__row">
-                <div>
-                  <p className="match-card__name">{m.peerName}</p>
-                  <p className="match-card__addr">{m.peerAddress}</p>
-                </div>
-                <span
-                  className={`pill pill--${m.status === "expired" ? "muted" : "accent"}`}
-                >
-                  {statusLabel(m.status)}
-                </span>
-              </div>
-
-              <div className="match-card__meta">
-                <span>매칭 {m.matchedAtLabel}</span>
-                {!m.expired ? (
-                  <span>
-                    내 첫 메시지{" "}
-                    {m.iSentFirst ? "온체인 기록됨" : "아직"}
-                    {" · "}
-                    상대방{" "}
-                    {m.peerSentFirst ? "기록됨" : "아직"}
-                  </span>
-                ) : (
-                  <span>만료 처리됨</span>
-                )}
-              </div>
-
-              {!m.expired ? (
-                <div className="timer">
-                  <div className="timer__labels">
-                    <span>48시간 윈도우</span>
-                    <span>{m.timeLeftPercent}% 남음</span>
-                  </div>
-                  <div className="timer__track">
-                    <div
-                      className="timer__fill"
-                      style={{ width: `${m.timeLeftPercent}%` }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <p className="match-card__note">
-                  고스트 방지: 양쪽 평판 <strong>−1</strong>
-                </p>
-              )}
-
-              {!m.expired ? (
-                <div className="match-card__actions">
-                  <Link
-                    className="btn btn--outline btn--full"
-                    to={`/chat/${m.peerAddress}`}
-                  >
-                    채팅 열기
-                  </Link>
-                  {m.iSentFirst && m.peerSentFirst && contractAddress && (
-                    <RefundButton
-                      peerAddress={m.peerAddress}
-                      contractAddress={contractAddress}
-                    />
-                  )}
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="match-list">
+        <li className="match-card">
+          <div className="match-card__row">
+            <div>
+              <p className="match-card__name">{demo.peerName}</p>
+              <p className="match-card__addr">{demo.peerAddress}</p>
+            </div>
+            <span className="pill pill--accent">첫 메시지 완료</span>
+          </div>
+          <div className="match-card__meta">
+            <span>매칭 {demo.matchedAtLabel}</span>
+            <span>서로 좋아요 · 채팅 가능</span>
+          </div>
+          <div className="timer">
+            <div className="timer__labels">
+              <span>48시간 윈도우</span>
+              <span>{demo.timeLeftPercent}% 남음</span>
+            </div>
+            <div className="timer__track">
+              <div className="timer__fill" style={{ width: `${demo.timeLeftPercent}%` }} />
+            </div>
+          </div>
+          <div className="match-card__actions">
+            <Link className="btn btn--outline btn--full" to={`/chat/${demo.peerAddress}`}>
+              채팅 열기
+            </Link>
+          </div>
+        </li>
+      </ul>
     </div>
   );
 }

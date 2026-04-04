@@ -1,24 +1,7 @@
 import { Link } from "react-router-dom";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount } from "wagmi";
-
-import { MOCK_MATCHES } from "../data/mock";
-import {
-  loadChatInboxThreads,
-  type InboxThreadRow,
-} from "../lib/loadChatInboxThreads";
-import { getSupabase } from "../lib/supabaseClient";
+import { useState } from "react";
 
 type ChatFolder = "inbox" | "requests" | "archive";
-
-type DisplayThread = {
-  id: string;
-  peerAddress: `0x${string}`;
-  peerName: string;
-  lastPreview: string;
-  timeLabel: string;
-  expired: boolean;
-};
 
 const TABS: { id: ChatFolder; label: string }[] = [
   { id: "inbox", label: "매칭 대화" },
@@ -26,77 +9,67 @@ const TABS: { id: ChatFolder; label: string }[] = [
   { id: "archive", label: "보관함" },
 ];
 
-function mockThreads(folder: ChatFolder): DisplayThread[] {
-  if (folder === "requests") return [];
-  const list =
-    folder === "inbox"
-      ? MOCK_MATCHES.filter((m) => !m.expired)
-      : MOCK_MATCHES.filter((m) => m.expired);
-  return list.map((m) => ({
-    id: m.id,
-    peerAddress: m.peerAddress,
-    peerName: m.peerName,
-    lastPreview: m.lastPreview ?? "대화를 시작해 보세요",
-    timeLabel: m.matchedAtLabel,
-    expired: m.expired,
-  }));
-}
+type Thread = {
+  id: string;
+  peerAddress: `0x${string}`;
+  peerName: string;
+  preview: string;
+  timeLabel: string;
+};
 
-function fromRemoteRows(rows: InboxThreadRow[]): DisplayThread[] {
-  return rows.map((t) => ({
-    id: t.threadKey,
-    peerAddress: t.peerAddress,
-    peerName: t.peerName,
-    lastPreview: t.lastPreview,
-    timeLabel: t.timeLabel,
-    expired: false,
-  }));
-}
+const INBOX_THREADS: Thread[] = [
+  {
+    id: "t1",
+    peerAddress: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    peerName: "Mina",
+    preview: "내일 클라이밍 갈래?",
+    timeLabel: "2시간 전",
+  },
+];
+
+const REQUEST_THREADS: Thread[] = [
+  {
+    id: "r1",
+    peerAddress: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    peerName: "Jun",
+    preview: "매칭됐어요 👋 먼저 인사드려요!",
+    timeLabel: "어제",
+  },
+  {
+    id: "r2",
+    peerAddress: "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+    peerName: "Sora",
+    preview: "안녕하세요, 디자인 얘기 나눠요 🎨",
+    timeLabel: "3일 전",
+  },
+];
+
+const ARCHIVE_THREADS: Thread[] = [
+  {
+    id: "a1",
+    peerAddress: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+    peerName: "Hana",
+    preview: "좋아요 보냈어요 ❤️",
+    timeLabel: "1주 전",
+  },
+  {
+    id: "a2",
+    peerAddress: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
+    peerName: "Leo",
+    preview: "좋아요 보냈어요 ❤️",
+    timeLabel: "2주 전",
+  },
+];
 
 export function ChatsListPage() {
   const [folder, setFolder] = useState<ChatFolder>("inbox");
-  const { address } = useAccount();
-  const supabaseEnabled = Boolean(getSupabase());
-  const useRemote = Boolean(supabaseEnabled && address);
 
-  const [remoteThreads, setRemoteThreads] = useState<InboxThreadRow[]>([]);
-  const [inboxLoadFailed, setInboxLoadFailed] = useState(false);
-
-  const loadRemoteInbox = useCallback(async () => {
-    const sb = getSupabase();
-    if (!sb || !address) return;
-    const { threads, error } = await loadChatInboxThreads(sb, address);
-    setRemoteThreads(threads);
-    setInboxLoadFailed(error !== null);
-  }, [address]);
-
-  useEffect(() => {
-    if (!useRemote) {
-      setRemoteThreads([]);
-      setInboxLoadFailed(false);
-      return;
-    }
-    void loadRemoteInbox();
-    const t = window.setInterval(() => void loadRemoteInbox(), 12_000);
-    return () => window.clearInterval(t);
-  }, [useRemote, loadRemoteInbox]);
-
-  const threads = useMemo((): DisplayThread[] => {
-    if (folder === "requests") return [];
-    if (useRemote) {
-      if (folder === "inbox") {
-        const remote = fromRemoteRows(remoteThreads);
-        // 데모: 원격 스레드가 없으면 목 데이터 1건 표시
-        return remote.length > 0 ? remote : mockThreads("inbox").slice(0, 1);
-      }
-      return [];
-    }
-    return mockThreads(folder);
-  }, [folder, useRemote, remoteThreads]);
-
-  const inboxCount = useRemote
-    ? Math.max(remoteThreads.length, 1)
-    : MOCK_MATCHES.filter((m) => !m.expired).length;
+  const threads =
+    folder === "inbox"
+      ? INBOX_THREADS
+      : folder === "requests"
+        ? REQUEST_THREADS
+        : ARCHIVE_THREADS;
 
   return (
     <div className="page page--chats-friends">
@@ -104,31 +77,17 @@ export function ChatsListPage() {
         <h1 className="page__h">채팅</h1>
         <p className="page__lede">
           {folder === "inbox" ? (
-            <>
-              <span className="chats-friends-lede__count">{inboxCount}개</span>
-            </>
-          ) : folder === "archive" ? (
-            <>
-              <span className="chats-friends-lede__count">
-                {threads.length}개
-              </span>
-              <span className="chats-friends-lede__hint">
-                {" · 보관된 대화"}
-              </span>
-            </>
+            <span className="chats-friends-lede__count">{threads.length}개</span>
+          ) : folder === "requests" ? (
+            <span className="chats-friends-lede__hint">받은 대화 요청</span>
           ) : (
-            <span className="chats-friends-lede__hint">
-              받은 대화 요청이 여기에 표시돼요
-            </span>
+            <>
+              <span className="chats-friends-lede__count">{threads.length}개</span>
+              <span className="chats-friends-lede__hint">{" · 하트 보낸 상대"}</span>
+            </>
           )}
         </p>
       </div>
-
-      {useRemote && inboxLoadFailed && folder === "inbox" ? (
-        <p className="banner banner--warn" role="alert">
-          대화 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
-        </p>
-      ) : null}
 
       <div className="chats-friends-tabs" role="tablist" aria-label="대화 구분">
         {TABS.map((t) => (
@@ -149,43 +108,35 @@ export function ChatsListPage() {
         ))}
       </div>
 
-      {folder === "requests" ? (
-        <p className="chats-friends-empty">
-          아직 요청이 없어요. 매칭을 받으면 여기에 표시돼요.
-        </p>
-      ) : threads.length === 0 ? (
-        <p className="chats-friends-empty">
-          {folder === "archive"
-            ? "보관된 대화가 없어요."
-            : "열린 대화가 없어요."}
-        </p>
-      ) : (
-        <ul className="chats-friends-list">
-          {threads.map((m) => (
-            <li key={m.id}>
-              <Link
-                className={
-                  m.expired
-                    ? "chats-friends-row chats-friends-row--muted"
-                    : "chats-friends-row"
-                }
-                to={`/chat/${m.peerAddress}`}
-              >
+      <ul className="chats-friends-list">
+        {threads.map((m) => (
+          <li key={m.id}>
+            {folder === "archive" ? (
+              <div className="chats-friends-row chats-friends-row--muted" style={{ cursor: "default" }}>
                 <span className="chats-friends-row__avatar" aria-hidden>
                   {m.peerName.slice(0, 1)}
                 </span>
                 <div className="chats-friends-row__body">
                   <span className="chats-friends-row__name">{m.peerName}</span>
-                  <span className="chats-friends-row__preview">
-                    {m.lastPreview}
-                  </span>
+                  <span className="chats-friends-row__preview">{m.preview}</span>
+                </div>
+                <span className="chats-friends-row__time">{m.timeLabel}</span>
+              </div>
+            ) : (
+              <Link className="chats-friends-row" to={`/chat/${m.peerAddress}`}>
+                <span className="chats-friends-row__avatar" aria-hidden>
+                  {m.peerName.slice(0, 1)}
+                </span>
+                <div className="chats-friends-row__body">
+                  <span className="chats-friends-row__name">{m.peerName}</span>
+                  <span className="chats-friends-row__preview">{m.preview}</span>
                 </div>
                 <span className="chats-friends-row__time">{m.timeLabel}</span>
               </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+            )}
+          </li>
+        ))}
+      </ul>
 
       <div className="chats-friends-footer">
         <Link to="/" className="chats-friends-cta">
