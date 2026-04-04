@@ -10,6 +10,7 @@ import {
   type MockProfile,
 } from "../data/mock";
 import { useMyRegistration } from "../hooks/useMatchingEngine";
+import { useUserBadges } from "../hooks/useUserBadges";
 
 type RecoProfileCardProps = {
   profile: MockProfile;
@@ -31,6 +32,7 @@ function RecoProfileCard({
   onLike,
 }: RecoProfileCardProps) {
   const [imgFailed, setImgFailed] = useState(false);
+  const { hasBalanceBadge, isAdultVerified, ageRangeLabel } = useUserBadges(p.targetAddress);
 
   useEffect(() => {
     setImgFailed(false);
@@ -61,6 +63,19 @@ function RecoProfileCard({
             <div className="reco-card__meta">
               <h3 className="reco-card__name">{p.name}</h3>
               <p className="reco-card__tagline">{p.tagline}</p>
+              {(hasBalanceBadge || isAdultVerified || ageRangeLabel) && (
+                <div className="reco-card__badges">
+                  {hasBalanceBadge && (
+                    <span className="reco-badge reco-badge--balance" title="잔액 인증">💎</span>
+                  )}
+                  {isAdultVerified && (
+                    <span className="reco-badge reco-badge--adult" title="성인 인증">✓ 성인</span>
+                  )}
+                  {ageRangeLabel && (
+                    <span className="reco-badge reco-badge--age" title="나이대 인증">{ageRangeLabel}</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           {showActions && onPass && onLike ? (
