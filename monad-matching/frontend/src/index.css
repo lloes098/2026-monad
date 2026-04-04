@@ -1034,6 +1034,7 @@ button.category-tile {
   background: rgba(24, 24, 27, 0.92);
   color: #fafafa;
   box-shadow: var(--shadow-md);
+  z-index: 100;
   animation: toast-in 0.22s ease;
 }
 
